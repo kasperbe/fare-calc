@@ -1,21 +1,32 @@
 package ingress
 
 import (
-	"fmt"
-	"os"
 	"testing"
 )
 
-func TestFindDelimiterWithoutNewline(t *testing.T) {
-	input := []byte(`1,some,thing,else`)
+func TestIndexLastSegment(t *testing.T) {
+	tt := []struct {
+		Name     string
+		Input    []byte
+		Expected int
+	}{
+		{"No newline", []byte(`1,some,thing,else`), 17},
+		{"Same ID", []byte(string("1,some,thing,else\n1,some,thing,else\n1,some,thing,else\n1,some,thing,else")), 53},
+		{"Diff ids", []byte(string("1,some,thing,else\n2,some,thing,else\n3,some,thing,else")), 35},
+		{"Empty buffer", []byte{}, 0},
+	}
 
-	offset := findDelimiter(input)
-	if offset != 17 {
-		t.Errorf("Wrong offset: expected %d, got %d", 17, offset)
+	for _, tc := range tt {
+		t.Run(tc.Name, func(t *testing.T) {
+			offset := indexLastSegment(tc.Input)
+			if offset != tc.Expected {
+				t.Errorf("Wrong offset: expected %d, got %d", tc.Expected, offset)
+			}
+		})
 	}
 }
 
-func TestFindDelimiter(t *testing.T) {
+func TestRead(t *testing.T) {
 	input := []byte(`1,some,thing,else
 1,some,thing,else
 1,some,thing,else
@@ -25,19 +36,8 @@ func TestFindDelimiter(t *testing.T) {
 2,some,thing,else
 2,some,thing,else`)
 
-	offset := findDelimiter(input)
+	offset := indexLastSegment(input)
 	if offset != 107 {
 		t.Error("Wrong offset")
 	}
-}
-func TestReadFile(t *testing.T) {
-	file, _ := os.Open("./paths.csv")
-
-	for chunk := range Read(file, 10*2048) {
-		fmt.Println("Recieving: ", string(chunk))
-	}
-
-	t.Log()
-	t.Error()
-
 }

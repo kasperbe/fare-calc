@@ -4,15 +4,26 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/kasperbe/beat/gps"
 )
 
-// calculatePrice for a distance travelled.
-func calculatePrice(a, b gps.Coordinate, time float64) (float64, error) {
+const (
+	day   = 0.75
+	night = 1.30
+	idle  = 11.90
+)
 
+// calculatePrice for a distance travelled.
+// We assume that if the segment is started at either day or night
+// it also ends in the same time range.
+func calculatePrice(a, b gps.Coordinate, starttime, endtime int64) (float64, error) {
+	duration := float64(endtime - starttime)
+
+	h, _, _ := time.Unix(starttime, 0).Clock()
 	distance := gps.Distance(a, b)
-	mps := distance / float64(time)
+	mps := distance / duration
 	speed := mps * 3.6
 	km := distance / 1000
 
@@ -21,11 +32,14 @@ func calculatePrice(a, b gps.Coordinate, time float64) (float64, error) {
 	}
 
 	if speed > 10 {
+		if h >= 5 && h <= 24 {
+			return km * 0.74, nil
+		}
 		return km * 1.30, nil
 	}
 
 	if speed <= 10 {
-		return float64(time/60/60) * 11.90, nil
+		return duration / 60 / 60 * 11.90, nil
 	}
 
 	return 0, nil
@@ -35,15 +49,7 @@ func calculatePrice(a, b gps.Coordinate, time float64) (float64, error) {
 type SegmentPoint struct {
 	ID         string
 	Coordinate gps.Coordinate
-	Timestamp  float64
-}
-
-// New Aggregator
-func New() Aggregator {
-	return Aggregator{
-		fares:     make(map[string]*SegmentPoint),
-		Estimates: make(map[string]float64),
-	}
+	Timestamp  int64
 }
 
 // Aggregator handles
@@ -61,7 +67,7 @@ type Aggregator struct {
 //
 // If the speed is above 100 km/h an error occurs in the calculate price function
 // we simply skip the point and move forward.
-func (aggr *Aggregator) AddSegment(id string, coord gps.Coordinate, timestamp float64) {
+func (aggr *Aggregator) AddSegment(id string, coord gps.Coordinate, timestamp int64) {
 	fare, exists := aggr.fares[id]
 	if !exists {
 		aggr.fares[id] = &SegmentPoint{
@@ -82,8 +88,7 @@ func (aggr *Aggregator) AddSegment(id string, coord gps.Coordinate, timestamp fl
 		return
 	}
 
-	time := timestamp - fare.Timestamp
-	price, err := calculatePrice(fare.Coordinate, coord, time)
+	price, err := calculatePrice(fare.Coordinate, coord, fare.Timestamp, timestamp)
 	if err != nil {
 		// Price is above 100 km/h
 		// Segment is not valid
@@ -99,20 +104,27 @@ func (aggr *Aggregator) AddSegment(id string, coord gps.Coordinate, timestamp fl
 
 // Aggregate segments to the estimated cost
 func Aggregate(chunk []byte) map[string]float64 {
-	aggr := New()
+	if len(chunk) < 1 {
+		return map[string]float64{}
+	}
+
+	aggr := Aggregator{
+		fares:     make(map[string]*SegmentPoint),
+		Estimates: make(map[string]float64),
+	}
 
 	lines := strings.Split(string(chunk), "\n")
+	var lat, lng float64
+	var timestamp int64
 	for _, line := range lines {
 		if len(line) < 1 {
 			continue
 		}
-
 		row := strings.Split(line, ",")
-		id := row[0]
-		lat, _ := strconv.ParseFloat(row[1], 64)
-		lng, _ := strconv.ParseFloat(row[2], 64)
-		timestamp, _ := strconv.ParseFloat(row[3], 64)
-		aggr.AddSegment(id, gps.Coordinate{Lat: lat, Lng: lng}, timestamp)
+		lat, _ = strconv.ParseFloat(row[1], 64)
+		lng, _ = strconv.ParseFloat(row[2], 64)
+		timestamp, _ = strconv.ParseInt(row[3], 10, 64)
+		aggr.AddSegment(row[0], gps.Coordinate{Lat: lat, Lng: lng}, timestamp)
 	}
 
 	return aggr.Estimates

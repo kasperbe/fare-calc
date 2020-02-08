@@ -8,7 +8,8 @@ import (
 	"strings"
 )
 
-func findDelimiter(buffer []byte) int {
+// indexLastSegment finds the index of the last \n after a complete set of segments
+func indexLastSegment(buffer []byte) int {
 	offset := len(buffer)
 	lastid := ""
 
@@ -71,7 +72,7 @@ func Read(f *os.File, bufsize int64) chan []byte {
 				break
 			}
 
-			delim := int64(findDelimiter(buffer))
+			delim := int64(indexLastSegment(buffer))
 			if delim < 0 {
 				ch <- buffer
 				break

@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	file, _ := os.Open("./paths.csv")
+	file, _ := os.Open("./paths-big.csv")
 	defer file.Close()
 
 	ch := make(chan map[string]float64, 10)
@@ -36,7 +36,6 @@ func main() {
 	defer writer.Flush()
 	wg2.Add(1)
 	go func() {
-		fmt.Println("Setting up writer")
 		for estimates := range ch {
 			for id, estimate := range estimates {
 				err = writer.Write([]string{id, fmt.Sprintf("%.02f", estimate)})
