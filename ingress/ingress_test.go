@@ -33,7 +33,7 @@ func TestFindDelimiter(t *testing.T) {
 func TestReadFile(t *testing.T) {
 	file, _ := os.Open("./paths.csv")
 
-	for chunk := range Read(file, 250) {
+	for chunk := range Read(file, 10*2048) {
 		fmt.Println("Recieving: ", string(chunk))
 	}
 

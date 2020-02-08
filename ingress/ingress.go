@@ -15,7 +15,14 @@ func findDelimiter(buffer []byte) int {
 	for {
 		index := bytes.LastIndex(buffer[:offset], []byte("\n"))
 		if index < 0 {
-			return len(buffer)
+			// If we didn't find a newline which split the segment, we look for the last newline
+			// in the entire buffer.
+			// If we can't find a newline anywhere in the buffer, we just return the entire buffer.
+			findex := bytes.LastIndex(buffer, []byte("\n"))
+			if findex < 0 {
+				return len(buffer)
+			}
+			return findex
 		}
 
 		line := string(buffer[index:offset])
@@ -36,13 +43,14 @@ func findDelimiter(buffer []byte) int {
 // This is done to ensure we have chunks that doesn't break in the middle of a segment.
 func Read(f *os.File, bufsize int64) chan []byte {
 	offset := int64(0)
-	ch := make(chan []byte, 10)
+	ch := make(chan []byte, 20)
 	buffer := make([]byte, bufsize)
 	fileinfo, _ := f.Stat()
 	filesize := fileinfo.Size()
 
 	go func() {
 		for {
+
 			if bufsize > filesize-offset {
 				// Make sure we don't try to read more bytes from the file than what's left.
 				buffer = make([]byte, filesize-offset)
@@ -56,6 +64,11 @@ func Read(f *os.File, bufsize int64) chan []byte {
 			_, err := f.ReadAt(buffer, offset)
 			if err != nil {
 				log.Fatal(fmt.Errorf("%w trying to read file", err))
+			}
+
+			if int64(len(buffer)) < bufsize {
+				ch <- buffer
+				break
 			}
 
 			delim := int64(findDelimiter(buffer))
