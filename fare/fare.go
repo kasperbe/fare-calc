@@ -95,6 +95,7 @@ func (aggr *Aggregator) AddSegment(id string, coord gps.Coordinate, timestamp in
 		return
 	}
 
+	// Reuse the allocated SegmentPoint for the id
 	fare.Timestamp = 0
 	fare.Coordinate.Lat = 0
 	fare.Coordinate.Lng = 0

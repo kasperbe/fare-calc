@@ -15,7 +15,7 @@ import (
 
 var cpuprofile = flag.String("profile", "", "filename of profile output")
 var inputfilename = flag.String("input", "./paths.csv", "filename of input csv file")
-var outfilename = flag.String("output", "results.csv", "filename of result csv file")
+var outfilename = flag.String("output", "result.csv", "filename of result csv file")
 
 func profile() func() {
 	f, err := os.Create(*cpuprofile)
