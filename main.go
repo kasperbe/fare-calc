@@ -16,17 +16,16 @@ func main() {
 	defer file.Close()
 
 	ch := make(chan map[string]float64, 10)
-	wg := sync.WaitGroup{}
+	readwg := sync.WaitGroup{}
 	for chunk := range ingress.Read(file, 10*10*1024) {
-		wg.Add(1)
+		readwg.Add(1)
 		go func(chunk []byte) {
 			estimates := fare.Aggregate(chunk)
 			ch <- estimates
-			wg.Done()
+			readwg.Done()
 		}(chunk)
 	}
 
-	wg2 := sync.WaitGroup{}
 	file, err := os.Create("result.csv")
 	if err != nil {
 		log.Fatalf("failed creating file: %s", err)
@@ -34,7 +33,11 @@ func main() {
 	defer file.Close()
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
-	wg2.Add(1)
+
+	writewg := sync.WaitGroup{}
+	defer writewg.Wait()
+
+	writewg.Add(1)
 	go func() {
 		for estimates := range ch {
 			for id, estimate := range estimates {
@@ -44,10 +47,8 @@ func main() {
 				}
 			}
 		}
-		wg2.Done()
 	}()
 
-	wg.Wait()
+	readwg.Wait()
 	close(ch)
-	wg2.Wait()
 }
