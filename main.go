@@ -2,17 +2,38 @@ package main
 
 import (
 	"encoding/csv"
+	"flag"
 	"fmt"
 	"log"
 	"os"
+	"runtime/pprof"
 	"sync"
 
 	"github.com/kasperbe/beat/fare"
 	"github.com/kasperbe/beat/ingress"
 )
 
+var cpuprofile = flag.String("profile", "", "filename of profile output")
+var inputfilename = flag.String("input", "./paths.csv", "filename of input csv file")
+var outfilename = flag.String("output", "results.csv", "filename of result csv file")
+
+func profile() func() {
+	f, err := os.Create(*cpuprofile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	pprof.StartCPUProfile(f)
+	return pprof.StopCPUProfile
+}
+
 func main() {
-	file, _ := os.Open("./paths-big.csv")
+	flag.Parse()
+	if *cpuprofile != "" {
+		stop := profile()
+		defer stop()
+	}
+
+	file, _ := os.Open(*inputfilename)
 	defer file.Close()
 
 	ch := make(chan map[string]float64, 10)
@@ -26,12 +47,9 @@ func main() {
 		}(chunk)
 	}
 
-	file, err := os.Create("result.csv")
-	if err != nil {
-		log.Fatalf("failed creating file: %s", err)
-	}
+	outfile, _ := os.Create(*outfilename)
 	defer file.Close()
-	writer := csv.NewWriter(file)
+	writer := csv.NewWriter(outfile)
 	defer writer.Flush()
 
 	writewg := sync.WaitGroup{}
@@ -41,12 +59,14 @@ func main() {
 	go func() {
 		for estimates := range ch {
 			for id, estimate := range estimates {
-				err = writer.Write([]string{id, fmt.Sprintf("%.02f", estimate)})
+				err := writer.Write([]string{id, fmt.Sprintf("%.02f", estimate)})
 				if err != nil {
-					fmt.Println("err", err)
+					log.Fatalf("%w while trying to write file", err)
 				}
 			}
 		}
+
+		writewg.Done()
 	}()
 
 	readwg.Wait()
