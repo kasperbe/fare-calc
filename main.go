@@ -34,6 +34,7 @@ func main() {
 	}
 
 	file, _ := os.Open(*inputfilename)
+	defer file.Close()
 
 	ch := make(chan map[string]float64, 10)
 	readwg := sync.WaitGroup{}
@@ -45,7 +46,6 @@ func main() {
 			readwg.Done()
 		}(chunk)
 	}
-	file.Close()
 
 	outfile, _ := os.Create(*outfilename)
 	defer file.Close()
@@ -71,4 +71,5 @@ func main() {
 
 	readwg.Wait()
 	close(ch)
+
 }

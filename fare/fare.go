@@ -1,6 +1,7 @@
 package fare
 
 import (
+	"bytes"
 	"errors"
 	"strconv"
 	"strings"
@@ -103,6 +104,8 @@ func (aggr *Aggregator) AddSegment(id string, coord gps.Coordinate, timestamp in
 	aggr.Estimates[id] += price
 }
 
+var lines []string
+
 // Aggregate segments to the estimated cost
 func Aggregate(chunk []byte) map[string]float64 {
 	if len(chunk) < 1 {
@@ -114,17 +117,16 @@ func Aggregate(chunk []byte) map[string]float64 {
 		Estimates: make(map[string]float64),
 	}
 
-	lines := strings.Split(string(chunk), "\n")
-	var lat, lng float64
-	var timestamp int64
+	lines := bytes.Split(chunk, []byte("\n"))
 	for _, line := range lines {
 		if len(line) < 1 {
 			continue
 		}
-		row := strings.Split(line, ",")
-		lat, _ = strconv.ParseFloat(row[1], 64)
-		lng, _ = strconv.ParseFloat(row[2], 64)
-		timestamp, _ = strconv.ParseInt(row[3], 10, 64)
+		row := strings.Split(string(line), ",")
+		lat, _ := strconv.ParseFloat(row[1], 64)
+		lng, _ := strconv.ParseFloat(row[2], 64)
+		timestamp, _ := strconv.ParseInt(row[3], 10, 64)
+
 		aggr.AddSegment(row[0], gps.Coordinate{Lat: lat, Lng: lng}, timestamp)
 	}
 

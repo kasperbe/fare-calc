@@ -43,15 +43,14 @@ func indexLastSegment(buffer []byte) int {
 // traverse backwards until we find a different id and break the chunk at this point
 // This is done to ensure we have chunks that doesn't break in the middle of a segment.
 func Read(f *os.File, bufsize int64) chan []byte {
-	offset := int64(0)
 	ch := make(chan []byte, 20)
-	buffer := make([]byte, bufsize)
-	fileinfo, _ := f.Stat()
-	filesize := fileinfo.Size()
 
 	go func() {
+		offset := int64(0)
+		buffer := make([]byte, bufsize)
+		fileinfo, _ := f.Stat()
+		filesize := fileinfo.Size()
 		for {
-
 			if bufsize > filesize-offset {
 				// Make sure we don't try to read more bytes from the file than what's left.
 				buffer = make([]byte, filesize-offset)
@@ -80,7 +79,6 @@ func Read(f *os.File, bufsize int64) chan []byte {
 
 			offset += delim
 			ch <- buffer[0:delim]
-			buffer = make([]byte, bufsize)
 		}
 
 		close(ch)
